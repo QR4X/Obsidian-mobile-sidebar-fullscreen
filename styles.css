@@ -1,0 +1,100 @@
+/*
+ * Mobile Sidebar Fullscreen
+ *
+ * Alle Regeln sind auf Telefone beschränkt (body.is-phone), damit Desktop
+ * und Tablet unangetastet bleiben.
+ */
+
+/* ------------------------------------------------------------------ *
+ * 1. Seitenleiste in voller Breite
+ *
+ * Obsidian begrenzt die mobile Seitenleiste über drei CSS-Variablen
+ * (app.css: --mobile-sidebar-width: 84vw, --mobile-sidebar-max-width: 450px).
+ * Wir setzen sie auf der Body-Ebene um, damit die Werte an den Drawer
+ * vererbt werden. Die Breite kommt aus --msf-drawer-width (Einstellung).
+ * ------------------------------------------------------------------ */
+body.is-phone.msf-sidebar-full {
+	--mobile-sidebar-width: var(--msf-drawer-width, 100vw);
+	--mobile-sidebar-min-width: var(--msf-drawer-width, 100vw);
+	--mobile-sidebar-max-width: var(--msf-drawer-width, 100vw);
+	--mobile-sidebar-radius: 0;
+}
+
+/* ------------------------------------------------------------------ *
+ * 2. Platz zurückgewinnen, wenn Obsidian die Leisten ausblendet
+ *
+ * Bei aktivem "Vollbild" (Einstellungen -> Darstellung) setzt Obsidian
+ * beim Scrollen die Body-Klasse .is-hidden-nav. Sie versteckt obere
+ * Kopfzeile und untere Navigationsleiste, lässt aber den reservierten
+ * Abstand (--view-top-spacing / --view-bottom-spacing) stehen. Dadurch
+ * bleibt oben/unten ein leerer Streifen. Hier reduzieren wir den Abstand
+ * auf die Safe-Area und schalten die Fade-Masken ab.
+ * ------------------------------------------------------------------ */
+body.is-phone.msf-reclaim-space.is-hidden-nav {
+	--view-top-spacing: var(--safe-area-inset-top, 0px);
+	--view-top-spacing-markdown: calc(var(--safe-area-inset-top, 0px) + var(--size-4-2));
+	--view-bottom-spacing: max(calc(var(--safe-area-inset-bottom, 0px) - var(--keyboard-height, 0px)), 0px);
+	--view-top-fade-mask: none;
+	--view-bottom-fade-mask: none;
+}
+
+body.is-phone.msf-reclaim-space.is-hidden-nav .mod-root {
+	mask-image: none;
+}
+
+/* ------------------------------------------------------------------ *
+ * 3. Manuelles Vollbild (eigener Umschalter)
+ *
+ * Blendet Kopfzeile und untere Navigationsleiste aus und nutzt den
+ * kompletten Bildschirm. Zum Verlassen dient der schwebende Button
+ * oben rechts; deshalb muss die Navigationsleiste nicht sichtbar bleiben.
+ * ------------------------------------------------------------------ */
+body.is-phone.msf-fullscreen .view-header,
+body.is-phone.msf-fullscreen .mobile-navbar {
+	display: none !important;
+}
+
+body.is-phone.msf-fullscreen {
+	--view-top-spacing: var(--safe-area-inset-top, 0px);
+	--view-top-spacing-markdown: calc(var(--safe-area-inset-top, 0px) + var(--size-4-2));
+	--view-bottom-spacing: max(calc(var(--safe-area-inset-bottom, 0px) - var(--keyboard-height, 0px)), 0px);
+	--view-top-fade-mask: none;
+	--view-bottom-fade-mask: none;
+}
+
+body.is-phone.msf-fullscreen .mod-root {
+	mask-image: none;
+}
+
+body.is-phone.msf-fullscreen.msf-hide-toolbar .mobile-toolbar,
+body.is-phone.msf-fullscreen.msf-hide-toolbar .mobile-toolbar-spacer {
+	display: none !important;
+}
+
+/* ------------------------------------------------------------------ *
+ * 4. Schwebender "Vollbild beenden"-Button (oben rechts)
+ * ------------------------------------------------------------------ */
+.msf-exit-button {
+	display: none;
+}
+
+body.is-phone.msf-fullscreen .msf-exit-button {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	position: fixed;
+	top: max(var(--safe-area-inset-top, 0px), var(--size-4-2));
+	right: max(var(--safe-area-inset-right, 0px), var(--size-4-2));
+	width: var(--touch-size-m, 40px);
+	height: var(--touch-size-m, 40px);
+	border-radius: 50%;
+	color: var(--text-muted);
+	background-color: var(--background-secondary);
+	box-shadow: var(--shadow-s);
+	z-index: var(--layer-popover);
+	opacity: 0.85;
+}
+
+body.is-phone.msf-fullscreen .msf-exit-button .svg-icon {
+	--icon-size: var(--icon-m);
+}

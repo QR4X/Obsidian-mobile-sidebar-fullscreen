@@ -1,0 +1,10 @@
+{
+	"id": "mobile-sidebar-fullscreen",
+	"name": "Mobile Sidebar Fullscreen",
+	"version": "0.1.0",
+	"minAppVersion": "1.9.0",
+	"description": "Öffnet die mobile Seitenleiste in voller Breite und lässt die Notiz den Platz nutzen, wenn Obsidian die Leisten ausblendet.",
+	"author": "QR4X",
+	"authorUrl": "https://github.com/QR4X",
+	"isDesktopOnly": false
+}
