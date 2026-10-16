@@ -1,0 +1,129 @@
+name: Release
+
+# Auslöser: Push eines Versions-Tags (z. B. 0.1.0, ohne "v"-Präfix) oder manuell
+# über den Actions-Tab. Der Lauf prüft Tag == manifest.json, baut main.js und
+# legt eine GitHub-Release mit den drei Dateien an, die Obsidian/BRAT brauchen:
+# main.js, manifest.json, styles.css.
+#
+# Warum zusätzlich workflow_dispatch: In einem anderen Repository löste der
+# Tag-Push den Workflow nicht zuverlässig aus (siehe Vault-Learning
+# "Release-Workflow per Tag-Push löst nicht aus"). Der manuelle Weg ist der
+# verlässliche Fallback:
+#
+#   gh workflow run release.yml --ref <tag> -f version=<tag>
+#
+# Vor jedem Release: manifest.json-Version bumpen und committen. Die Tag-Version
+# muss gleich der Manifest-Version sein.
+#
+# Beta-Build: Tag mit Bindestrich, z. B. 0.1.1-beta.1. Er wird als Pre-Release
+# veröffentlicht; die manifest.json im Repository bleibt unverändert, nur die
+# Manifest-Datei INNERHALB der Release trägt die Tag-Version. BRAT sieht die
+# Beta, das offizielle Verzeichnis bleibt auf der stabilen Version.
+
+on:
+  push:
+    tags:
+      - "*.*.*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version zum Veröffentlichen (leer = manifest.json)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Abhängigkeiten installieren
+        run: npm install
+
+      - name: Typprüfung und Build
+        run: npm run build
+
+      - name: Version auflösen
+        id: version
+        run: |
+          if [ "${GITHUB_REF}" = "${GITHUB_REF#refs/tags/}" ]; then
+            version="${{ github.event.inputs.version }}"
+            if [ -z "$version" ]; then
+              version=$(node -p "require('./manifest.json').version")
+            fi
+          else
+            version="${GITHUB_REF#refs/tags/}"
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Version: $version"
+
+      - name: Version gegen manifest.json prüfen
+        id: kind
+        run: |
+          version="${{ steps.version.outputs.version }}"
+          ver=$(node -p "require('./manifest.json').version")
+          case "$version" in
+            *-*)
+              base="${version%%-*}"
+              newer=$(node -e "const a='$base'.split('.').map(Number),b='$ver'.split('.').map(Number);let r=0;for(let i=0;i<3;i++){if(a[i]!==b[i]){r=a[i]>b[i]?1:-1;break}}console.log(r>0?'yes':'no')")
+              if [ "$newer" != "yes" ]; then
+                echo "::error::Pre-Release $version muss größer als die stabile Version ($ver) sein."
+                exit 1
+              fi
+              echo "prerelease=true" >> "$GITHUB_OUTPUT"
+              echo "OK: Pre-Release $version (stabil im Repository: $ver)"
+              ;;
+            *)
+              if [ "$version" != "$ver" ]; then
+                echo "::error::Tag ($version) != manifest.json ($ver). Erst Manifest-Version bumpen, dann taggen."
+                exit 1
+              fi
+              echo "prerelease=false" >> "$GITHUB_OUTPUT"
+              echo "OK: $version == $ver"
+              ;;
+          esac
+
+      - name: Manifest der Pre-Release stempeln
+        if: steps.kind.outputs.prerelease == 'true'
+        run: |
+          VERSION="${{ steps.version.outputs.version }}" node -e "const fs=require('fs');const m=JSON.parse(fs.readFileSync('manifest.json','utf8'));m.version=process.env.VERSION;fs.writeFileSync('manifest.json',JSON.stringify(m,null,2)+'\n');console.log('Manifest der Pre-Release:',m.version)"
+
+      - name: Build-Provenienz attestieren
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: |
+            main.js
+            styles.css
+
+      - name: GitHub-Release erstellen
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          version="${{ steps.version.outputs.version }}"
+          if gh release view "$version" >/dev/null 2>&1; then
+            echo "Release $version existiert bereits."
+            exit 0
+          fi
+          if [ "${{ steps.kind.outputs.prerelease }}" = "true" ]; then
+            gh release create "$version" \
+              --title "$version (Beta)" \
+              --target "${GITHUB_SHA}" \
+              --prerelease --latest=false \
+              --notes "Beta-Build $version für BRAT. Nicht die stabile Version." \
+              main.js manifest.json styles.css
+          else
+            gh release create "$version" \
+              --title "$version" \
+              --target "${GITHUB_SHA}" \
+              --notes "Release $version. Changelog: CHANGELOG.md" \
+              main.js manifest.json styles.css
+          fi
