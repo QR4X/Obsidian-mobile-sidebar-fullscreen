@@ -1,0 +1,1 @@
+# Obsidian-mobile-sidebar-fullscreen
